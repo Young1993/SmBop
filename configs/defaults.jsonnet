@@ -53,6 +53,7 @@ local large_setting = {
   rat_layers :: misc_params.rat_layers,
   grad_acum ::  misc_params.grad_acum,
   model_name :: "Salesforce/grappa_large_jnt",
+  // cn_model_name :: "",
   // model_name :: "google/bigbird-roberta-large",
   
   pretrained_embedding_dim :: 1024,

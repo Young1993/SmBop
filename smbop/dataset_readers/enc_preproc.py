@@ -7,6 +7,8 @@ import sqlite3
 import string
 import attr
 import nltk
+from nltk.stem import WordNetLemmatizer
+lemmatizer = WordNetLemmatizer()
 
 import numpy as np
 
@@ -73,7 +75,7 @@ class PreprocessedSchema:
     primary_keys = attr.ib(factory=list)
 
 
-STOPWORDS = set(nltk.corpus.stopwords.words("english"))
+STOPWORDS = set(nltk.corpus.stopwords.words("english")) # 需改成中文
 PUNKS = set(a for a in string.punctuation)
 
 
@@ -374,13 +376,25 @@ class EncPreproc:
     @classmethod
     def compute_schema_linking(cls, question, column, table):
         def partial_match(x_list, y_list):
+            x_len = len(x_list)
+            y_len = len(y_list)
             x_str = " ".join(x_list)
             y_str = " ".join(y_list)
+
             if x_str in STOPWORDS or x_str in PUNKS:
                 return False
+
             if re.match(rf"\b{re.escape(x_str)}\b", y_str):
                 assert x_str in y_str
                 return True
+            elif x_len <= y_len:
+                xx_str = " ".join(lemmatizer.lemmatize(o.lower()) for o in x_list)
+                yy_str = " ".join(lemmatizer.lemmatize(o.lower()) for o in y_list)
+
+                if re.search(rf"\b{re.escape(xx_str)}\b", yy_str):
+                    return True
+                else:
+                    return False
             else:
                 return False
 
@@ -415,7 +429,7 @@ class EncPreproc:
                     continue
                 # exact match case
                 for col_id in col_id2list:
-                    if exact_match(n_gram_list, col_id2list[col_id]):
+                    if exact_match(n_gram_list, col_id2list[col_id][:-2]):
                         for q_id in range(i, i + n):
                             q_col_match[f"{q_id},{col_id}"] = "CEM"
                 for tab_id in tab_id2list:
@@ -425,7 +439,7 @@ class EncPreproc:
 
                 # partial match case
                 for col_id in col_id2list:
-                    if partial_match(n_gram_list, col_id2list[col_id]):
+                    if partial_match(n_gram_list, col_id2list[col_id][:-2]):
                         for q_id in range(i, i + n):
                             if f"{q_id},{col_id}" not in q_col_match:
                                 q_col_match[f"{q_id},{col_id}"] = "CPM"
@@ -658,7 +672,7 @@ class EncPreproc:
                     table_name = tokenize_func(
                         column.table.name, column.table.unsplit_name
                     )
-                column_name += ["<table-sep>"] + table_name
+                column_name += ["<table-sep>"] + table_name # table flag
             r.column_names.append(column_name)
 
             table_id = None if column.table is None else column.table.id

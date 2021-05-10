@@ -139,7 +139,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
         self._op_names = [
             k for k in itertools.chain(binary_ops, unary_ops, ["nan", "Table", "Value"])
         ]
-        self._type_dict = OrderedDict({k: i for i, k in enumerate(self._op_names)})
+        self._type_dict = OrderedDict({k: i for i, k in enumerate(self._op_names)}) # op type
         self.keep_id = self._type_dict["keep"]
         self._ACTIONS = {k: 1 for k in unary_ops}
         self._ACTIONS.update({k: 2 for k in binary_ops})
@@ -147,8 +147,8 @@ class SmbopSpiderDatasetReader(DatasetReader):
         self.hasher = hashing.Hasher("cpu")
 
     def _init_fields(self, tree_obj):
-        tree_obj = node_util.add_max_depth_att(tree_obj)
-        tree_obj = node_util.tree2maxdepth(tree_obj)
+        tree_obj = node_util.add_max_depth_att(tree_obj) # compute the max depth
+        tree_obj = node_util.tree2maxdepth(tree_obj) # translate to Balanced tree
         tree_obj = self.hasher.add_hash_att(tree_obj, self._type_dict)
         hash_gold_tree = tree_obj.hash
         hash_gold_levelorder = []
@@ -308,7 +308,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
                 }
             )
 
-        desc = self.enc_preproc.get_desc(tokenized_utterance, db_id)
+        desc = self.enc_preproc.get_desc(tokenized_utterance, db_id) #
         entities, added_values, relation = self.extract_relation(desc)
 
         fields["relation"] = ArrayField(relation, padding_value=-1, dtype=np.int32)
