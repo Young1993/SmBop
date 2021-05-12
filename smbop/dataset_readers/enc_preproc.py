@@ -593,9 +593,12 @@ class EncPreproc:
             cursor = db_conn.cursor()
             word = word.replace("'", "")
             p_str = (
-                f"select {column} from {table} where {column} like '{word} %' or {column} like '% {word}' or "
-                f"{column} like '% {word} %' or {column} like '{word}'"
+                f"select {column} from {table} where {column} like '%{word}%' or {column} like '%{lemmatizer.lemmatize(word.lower())}%'"
             )
+            # p_str = (
+            #     f"select {column} from {table} where {column} like '{word} %' or {column} like '% {word}' or "
+            #     f"{column} like '% {word} %' or {column} like '{word}'"
+            # )
             # return False  # TODO: fixmes
             # print("hi")
             try:
@@ -615,7 +618,7 @@ class EncPreproc:
         for q_id, word in enumerate(tokens):
             if len(word.strip()) == 0:
                 continue
-            if word in STOPWORDS or word in PUNKS:
+            if word.lower() in STOPWORDS or word in PUNKS:
                 continue
 
             num_flag = isnumber(word)

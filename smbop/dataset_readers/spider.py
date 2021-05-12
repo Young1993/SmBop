@@ -172,13 +172,15 @@ class SmbopSpiderDatasetReader(DatasetReader):
         return instance
 
     @overrides
-    def _read(self, file_path: str):
-        if file_path.endswith(".json"):
-            yield from self._read_examples_file(file_path)
+    def _read(self, file_path): #:str
+        if type(file_path) == str and file_path.endswith(".json"):
+            yield from self._read_examples_file(file_path, 'str')
+        elif type(file_path) == list and file_path[0].endswith(".json"):
+            yield from self._read_examples_file(file_path, 'list')
         else:
             raise ConfigurationError(f"Don't know how to read filetype of {file_path}")
 
-    def _read_examples_file(self, file_path: str):
+    def _read_examples_file(self, file_path, type): # : str
         # cache_dir = os.path.join("cache", file_path.split("/")[-1])
 
         cnt = 0
@@ -192,23 +194,41 @@ class SmbopSpiderDatasetReader(DatasetReader):
                 cnt += 1
             sent_set.add(total_cnt)
 
-        
-        with open(file_path, "r") as data_file:
-            json_obj = json.load(data_file)
-            for total_cnt, ex in enumerate(json_obj):
-                if cnt >= self._max_instances:
-                    break
-                if len(cache_buffer)>50:
-                    self.cache.write(cache_buffer)
-                    cache_buffer = []
-                if total_cnt in sent_set:
-                    continue
-                else:    
-                    ins = self.create_instance(ex)
-                    cache_buffer.append([total_cnt, ins])
-                if ins is not None:
-                    yield ins
-                    cnt +=1
+        if type == 'str':
+            with open(file_path, "r") as data_file:
+                json_obj = json.load(data_file)
+                for total_cnt, ex in enumerate(json_obj):
+                    if cnt >= self._max_instances:
+                        break
+                    if len(cache_buffer)>50:
+                        self.cache.write(cache_buffer)
+                        cache_buffer = []
+                    if total_cnt in sent_set:
+                        continue
+                    else:
+                        ins = self.create_instance(ex)
+                        cache_buffer.append([total_cnt, ins])
+                    if ins is not None:
+                        yield ins
+                        cnt +=1
+        else:
+            for tmp_file_path in file_path:
+                with open(tmp_file_path, "r") as data_file:
+                    json_obj = json.load(data_file)
+                    for total_cnt, ex in enumerate(json_obj):
+                        if cnt >= self._max_instances:
+                            break
+                        if len(cache_buffer) > 50:
+                            self.cache.write(cache_buffer)
+                            cache_buffer = []
+                        if total_cnt in sent_set:
+                            continue
+                        else:
+                            ins = self.create_instance(ex)
+                            cache_buffer.append([total_cnt, ins])
+                        if ins is not None:
+                            yield ins
+                            cnt += 1
         self.cache.write(cache_buffer)
 
 

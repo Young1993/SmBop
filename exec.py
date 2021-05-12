@@ -26,7 +26,7 @@ def run():
     parser = argparse.ArgumentParser(allow_abbrev=True)
     parser.add_argument("--name", nargs="?")
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("--gpu", type=str, default="0")
+    parser.add_argument("--gpu", type=str, default="0") # 0 -1
     parser.add_argument("--recover", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--detect_anomoly", action="store_true")
@@ -60,9 +60,9 @@ def run():
     parser.add_argument("--rat_dropout", default=0.2, type=float)
     parser.add_argument("--lm_lr", default=3e-6, type=float)
     parser.add_argument("--lr", type=float, default=0.000186)
-    parser.add_argument("--batch_size", default=20, type=int)
+    parser.add_argument("--batch_size", default=20, type=int) # 20
     parser.add_argument("--grad_acum", default=4, type=int)
-    parser.add_argument("--max_steps", default=60000, type=int)
+    parser.add_argument("--max_steps", default=60000, type=int) # 60000
     parser.add_argument("--power", default=0.5, type=float)
     parser.add_argument("--temperature", default=1.0, type=float)
     parser.add_argument("--grad_clip", default=-1, type=float)
@@ -95,8 +95,10 @@ def run():
 
     experiment_name_parts = []
     experiment_name_parts.append(namegenerator.gen())
+
     if diff:
         experiment_name_parts.append(diff)
+
     if args.name:
         experiment_name_parts.append(args.name)
 
