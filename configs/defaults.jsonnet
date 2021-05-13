@@ -57,8 +57,8 @@ local large_setting = {
   // model_name :: "google/bigbird-roberta-large",
   
   pretrained_embedding_dim :: 1024,
-  cache_path ::  if misc_params.value_pred then "cache/exp700" else "cache/exp304_no_values",
-  // cache_path ::  if misc_params.value_pred then "cache/exp1000" else "cache/exp304_no_values",
+  // cache_path ::  if misc_params.value_pred then "cache/exp700" else "cache/exp304_no_values",
+  cache_path ::  if misc_params.value_pred then "cache/exp1000" else "cache/exp304_no_values",
   
 
 };
