@@ -1,6 +1,8 @@
 /backup
 .ipynb_checkpoints
 /dataset
+.idea/
+._dataset
 /cache
 /experiments/
 /prev_experiments/
