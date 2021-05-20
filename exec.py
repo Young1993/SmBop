@@ -26,7 +26,7 @@ def run():
     parser = argparse.ArgumentParser(allow_abbrev=True)
     parser.add_argument("--name", nargs="?")
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("--gpu", type=str, default="0") # 0 -1
+    parser.add_argument("--gpu", type=str, default="-1") # 0 -1
     parser.add_argument("--recover", action="store_true")
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--detect_anomoly", action="store_true")
@@ -39,6 +39,7 @@ def run():
     parser.add_argument("--disable_disentangle_cntx", action="store_true")
     parser.add_argument("--disable_cntx_reranker", action="store_true")
     parser.add_argument("--disable_value_pred", action="store_true")
+    parser.add_argument("--disable_use_longdb", action="store_true")
     parser.add_argument("--uniquify", action="store_true")
     parser.add_argument("--use_bce", action="store_true")
     parser.add_argument("--tfixup", action="store_true")
@@ -47,7 +48,9 @@ def run():
     parser.add_argument("--disable_utt_aug", action="store_true")
     parser.add_argument("--should_rerank", action="store_true")
     parser.add_argument("--use_treelstm", action="store_true")
-    parser.add_argument("--disable_db_content", action="store_true")
+    parser.add_argument("--disable_db_content", action="store_true",
+                        help="Run with this argument (once) before pre-proccessing to reduce the pre-proccessing time by half \
+                         This argument causes EncPreproc to not perform IR on the largest tables. ")
     parser.add_argument("--lin_after_cntx", action="store_true")
     parser.add_argument("--optimizer", type=str, default="adam")
     parser.add_argument("--rat_layers", type=int, default=8)
@@ -60,7 +63,7 @@ def run():
     parser.add_argument("--rat_dropout", default=0.2, type=float)
     parser.add_argument("--lm_lr", default=3e-6, type=float)
     parser.add_argument("--lr", type=float, default=0.000186)
-    parser.add_argument("--batch_size", default=30, type=int) # 20
+    parser.add_argument("--batch_size", default=30, type=int) # 30
     parser.add_argument("--grad_acum", default=4, type=int)
     parser.add_argument("--max_steps", default=60000, type=int) # 60000
     parser.add_argument("--power", default=0.5, type=float)
@@ -86,7 +89,7 @@ def run():
         else:
             ext_vars[key] = to_string(value)
     print(ext_vars)
-    default_config_file = "configs/defaults.jsonnet"
+    default_config_file = "configs/debug.jsonnet"  # defaults.jsonnet
 
     overrides_dict = {}
 
@@ -95,10 +98,8 @@ def run():
 
     experiment_name_parts = []
     experiment_name_parts.append(namegenerator.gen())
-
-    # if diff:
-    #     experiment_name_parts.append(diff)
-
+    if diff:
+        experiment_name_parts.append(diff)
     if args.name:
         experiment_name_parts.append(args.name)
 
@@ -112,12 +113,14 @@ def run():
         params_overrides=overrides_json,
     )
     prefix = ""
-#     prefix = "/home/ohadr/"
+    # prefix = "/home/ohadr/"
+    prefix = "/media/disk1/ohadr/"
 
     assert not pathlib.Path(f"{prefix}experiments/{experiment_name}").exists()
 
 #     sh.ln("-s", f"{prefix}/experiments/{experiment_name}", f"experiments/{experiment_name}")
     pathlib.Path(f"backup").mkdir(exist_ok=True)
+    pathlib.Path(f"cache").mkdir(exist_ok=True)
     # pathlib.Path(f"experiments/{experiment_name}").mkdir(exist_ok=True)
 
     subprocess.check_call(

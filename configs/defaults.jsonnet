@@ -16,6 +16,7 @@ local misc_params = {
           "cntx_beam":stringToBool("cntx_beam"),
           "disentangle_cntx":stringToBool("disentangle_cntx"),
           "value_pred":stringToBool("value_pred"),
+          "use_longdb":stringToBool("use_longdb"),
           "uniquify":stringToBool("uniquify"),
           "use_bce": stringToBool("use_bce"),
           "tiny_dataset":stringToBool("tiny_dataset"),
@@ -53,12 +54,11 @@ local large_setting = {
   rat_layers :: misc_params.rat_layers,
   grad_acum ::  misc_params.grad_acum,
   model_name :: "Salesforce/grappa_large_jnt",
-  // cn_model_name :: "",
   // model_name :: "google/bigbird-roberta-large",
   
   pretrained_embedding_dim :: 1024,
   // cache_path ::  if misc_params.value_pred then "cache/exp700" else "cache/exp304_no_values",
-  cache_path ::  if misc_params.value_pred then "cache/exp1000" else "cache/exp304_no_values",
+  cache_path ::  if misc_params.value_pred then "cache/exp2000" else "cache/exp304_no_values",
   
 
 };
@@ -75,7 +75,7 @@ local devset_config = {
 };
 local trainset_config = {
   cache_suffix :: "train",
-  data_suffix :: "train_spider.json",
+  data_suffix :: "train.json",
   limit_instances :: -1,
   limit_instances_val :: -1,
 };
@@ -95,7 +95,7 @@ local setting = large_setting + if misc_params.train_as_dev then trainset_config
 
 
 
-local should_rerank = misc_params.evaluate_on_test;
+local should_rerank = misc_params.should_rerank;
 
 
 local dataset_reader_name = "smbop";
@@ -118,6 +118,7 @@ local dataset_reader_name = "smbop";
     "max_instances": max_instances,
     "limit_instances" : setting.limit_instances, 
     "value_pred":misc_params.value_pred,
+    "use_longdb":misc_params.use_longdb,
   },
   "validation_dataset_reader": {
     "type": dataset_reader_name,
@@ -136,6 +137,7 @@ local dataset_reader_name = "smbop";
     "max_instances": max_instances,
     "limit_instances" : setting.limit_instances_val,
     "value_pred":misc_params.value_pred,
+    "use_longdb":misc_params.use_longdb,
   },
   "train_data_path": dataset_path + "train.json",
   // "train_data_path": [dataset_path + "train_spider.json", dataset_path + "train_others.json"],
@@ -220,11 +222,10 @@ local dataset_reader_name = "smbop";
     "use_amp":misc_params.amp,
     "num_epochs": std.floor((max_steps*setting.batch_size*setting.grad_acum)/examples),
     "cuda_device": std.parseInt(std.extVar('gpu')),
-    "patience": 50,
+    "patience": 100,
     "validation_metric":  "+spider",
 
-    
-  
+
   "num_gradient_accumulation_steps" : setting.grad_acum,
   "checkpointer": {"num_serialized_models_to_keep": 1},
     "optimizer": {
@@ -237,7 +238,5 @@ local dataset_reader_name = "smbop";
             },
     "learning_rate_scheduler": scheduler,
   },
-  // "distributed": {
-    // "cuda_devices": [0, 1],
-  // }
+
 }

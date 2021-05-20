@@ -540,6 +540,7 @@ class SmbopParser(Model):
             )
 
         outputs["leaf_beam_hash"] = beam_hash
+        outputs["hash_gold_levelorder"] = (batch_size*[None])
         # enc_list = [
         #     self.tokenizer.decode(enc["tokens"]["token_ids"][b].tolist())
         #     for b in range(batch_size)
@@ -690,7 +691,7 @@ class SmbopParser(Model):
         else:
             end = time.time()
             if tree_obj is not None:
-                outputs["hash_gold_levelorder"] = [hash_gold_levelorder]
+                outputs["hash_gold_levelorder"] = [hash_gold_levelorder]+([None]*(batch_size-1))
             self._compute_validation_outputs(
                 outputs,
                 hash_gold_tree,
@@ -752,6 +753,7 @@ class SmbopParser(Model):
         leaf_acc_list = []
         sql_list = []
         tree_list = []
+        beam_scores_el_list = []
         if hash_gold_tree is not None:
             for gs, fa in zip(hash_gold_tree, beam_hash.tolist()):
                 acc = int(gs) in fa
@@ -781,6 +783,7 @@ class SmbopParser(Model):
                 beam_scores_el[
                     : -self._beam_size
                 ] = allennlp.nn.util.min_value_of_dtype(beam_scores_el.dtype)
+                beam_scores_el_list.append(beam_scores_el)
                 top_idx = int(beam_scores_el.argmax())
                 tree_copy = ""
                 try:
@@ -803,8 +806,9 @@ class SmbopParser(Model):
                 spider_acc = 0
                 reranker_acc = 0
 
-                outputs["inf_time"] = [kwargs["inf_time"]]
-                outputs["total_time"] = [kwargs["total_time"]]
+                outputs["inf_time"] = [kwargs["inf_time"]]+([None]*(batch_size-1))
+                outputs["total_time"] = [kwargs["total_time"]] + \
+                    ([None]*(batch_size-1))
 
                 if hash_gold_tree is not None:
                     try:
@@ -825,17 +829,20 @@ class SmbopParser(Model):
                 sql_list.append(sql)
                 tree_list.append(tree_copy)
                 spider_acc_list.append(spider_acc)
-            outputs["beam_scores"] = [beam_scores_el]
-            outputs["beam_encoding"] = [kwargs["item_list"]]
-            outputs["beam_hash"] = [kwargs["beam_hash_tensor"]]
+            outputs["beam_scores"] = beam_scores_el_list
+            outputs["beam_encoding"] = [kwargs["item_list"]]+([None]*(batch_size-1))
+            outputs["beam_hash"] = [kwargs["beam_hash_tensor"]]+([None]*(batch_size-1))
+            # outputs["gold_hash"] = hash_gold_tree or ([None]*batch_size)
             if hash_gold_tree is not None:
                 outputs["gold_hash"] = hash_gold_tree
+            else:
+                outputs["gold_hash"] = [hash_gold_tree] + ([None]*(batch_size-1))
             outputs["reranker_acc"] = reranker_acc_list
             outputs["spider_acc"] = spider_acc_list
             outputs["sql_list"] = sql_list
             outputs["tree_list"] = tree_list
-        outputs["final_beam_acc"] = final_beam_acc_list
-        outputs["leaf_acc"] = leaf_acc_list
+        outputs["final_beam_acc"] = final_beam_acc_list or ([None]*batch_size)
+        outputs["leaf_acc"] = leaf_acc_list or ([None]*batch_size)
 
     def _augment_with_utterance(
         self,
@@ -867,7 +874,7 @@ class SmbopParser(Model):
         pad_dim = enc["tokens"]["mask"].size(-1)
         if pad_dim > 512:
             for key in enc["tokens"].keys():
-                enc["tokens"][key] = enc["tokens"][key][:, :512]
+                enc["tokens"][key] = enc["tokens"][key][:, :512] # cut
 
             embedded_utterance_schema = self._question_embedder(enc)
         else:
@@ -893,7 +900,7 @@ class SmbopParser(Model):
         embedded_utterance_schema = self._emb_to_action_dim(embedded_utterance_schema)
         enriched_utterance_schema = self._schema_encoder(
             embedded_utterance_schema, relation.long(), relation_mask
-        )
+        ) # RAT encoder
 
         utterance_schema, utterance_schema_mask = vec_utils.batched_span_select(
             enriched_utterance_schema, lengths

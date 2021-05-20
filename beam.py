@@ -48,10 +48,9 @@ def res_to_beam(res, model):
     sql_list = []
     for i in res.beam_scores.argsort():
         try:
-            items = res.beam_encoding[:(i // model._beam_size) + 2]
+            items = res.beam_encoding[:(i//model._beam_size)+2]
             tree_res = ra_postproc.reconstruct_tree(
-                model._op_names, model.binary_op_count, 0, i % model._beam_size, items, len(items) - 1,
-                model._n_schema_leafs)
+                model._op_names, model.binary_op_count, 0, i % model._beam_size, items, len(items)-1, model._n_schema_leafs)
             sql = ra_postproc.ra_to_sql(tree_res)
             sql_list.append(sql)
         except:

@@ -56,6 +56,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
         decoder_timesteps=9,
         limit_instances=-1,
         value_pred=True,
+        use_longdb=True,
     ):
         super().__init__(
             # lazy=lazy,
@@ -70,6 +71,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
         self._decoder_timesteps = decoder_timesteps
         self._max_instances = max_instances
         self.limit_instances = limit_instances
+        self.load_less = limit_instances!=-1
 
         self._utterance_token_indexers = question_token_indexers
 
@@ -90,6 +92,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
             qq_max_dist,
             cc_max_dist,
             tt_max_dist,
+            use_longdb,
         )
         self._create_action_dicts()
         self.replacer = Replacer(tables_file)
@@ -172,23 +175,18 @@ class SmbopSpiderDatasetReader(DatasetReader):
         return instance
 
     @overrides
-    def _read(self, file_path): #:str
+    def _read(self, file_path: str):
         if file_path.endswith(".json"):
             yield from self._read_examples_file(file_path)
         else:
             raise ConfigurationError(f"Don't know how to read filetype of {file_path}")
-        # if type(file_path) == str and file_path.endswith(".json"):
-        #     yield from self._read_examples_file(file_path, 'str')
-        # elif type(file_path) == list and file_path[0].endswith(".json"):
-        #     yield from self._read_examples_file(file_path, 'list')
-        # else:
-        #     raise ConfigurationError(f"Don't know how to read filetype of {file_path}")
 
-    def _read_examples_file(self, file_path, type='str'): # : str
+    def _read_examples_file(self, file_path: str):
         # cache_dir = os.path.join("cache", file_path.split("/")[-1])
 
         cnt = 0
         cache_buffer = []
+        cont_flag = True
         sent_set = set()
         for total_cnt,ins in self.cache:
             if cnt >= self._max_instances:
@@ -197,8 +195,11 @@ class SmbopSpiderDatasetReader(DatasetReader):
                 yield ins
                 cnt += 1
             sent_set.add(total_cnt)
+            if self.load_less and len(sent_set) > self.limit_instances:
+                cont_flag = False
+                break
 
-        if type == 'str':
+        if cont_flag:
             with open(file_path, "r") as data_file:
                 json_obj = json.load(data_file)
                 for total_cnt, ex in enumerate(json_obj):
@@ -215,25 +216,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
                     if ins is not None:
                         yield ins
                         cnt +=1
-        else:
-            for tmp_file_path in file_path:
-                with open(tmp_file_path, "r") as data_file:
-                    json_obj = json.load(data_file)
-                    for total_cnt, ex in enumerate(json_obj):
-                        if cnt >= self._max_instances:
-                            break
-                        if len(cache_buffer) > 50:
-                            self.cache.write(cache_buffer)
-                            cache_buffer = []
-                        if total_cnt in sent_set:
-                            continue
-                        else:
-                            ins = self.create_instance(ex)
-                            cache_buffer.append([total_cnt, ins])
-                        if ins is not None:
-                            yield ins
-                            cnt += 1
-        self.cache.write(cache_buffer)
+            self.cache.write(cache_buffer)
 
 
     def process_instance(self, instance: Instance, index: int):
@@ -335,7 +318,6 @@ class SmbopSpiderDatasetReader(DatasetReader):
         desc = self.enc_preproc.get_desc(tokenized_utterance, db_id) #
         entities, added_values, relation = self.extract_relation(desc)
 
-        fields["relation"] = ArrayField(relation, padding_value=-1, dtype=np.int32)
 
         question_concated = [[x] for x in tokenized_utterance[1:-1]]
         schema_tokens_pre, schema_tokens_pre_mask = table_text_encoding(
@@ -353,21 +335,24 @@ class SmbopSpiderDatasetReader(DatasetReader):
         entities_as_leafs = [x.split(":")[0] for x in entities[len(added_values) + 1 :]]
         entities_as_leafs = added_values + ["*"] + entities_as_leafs
         orig_entities = [self.replacer.post(x, db_id) for x in entities_as_leafs]
-        fields["entities"] = MetadataField(entities_as_leafs)
-        fields["orig_entities"] = MetadataField(orig_entities)
-
         entities_as_leafs_hash, entities_as_leafs_types = self.hash_schema(
             entities_as_leafs, added_values
         )
 
-        fields["leaf_hash"] = ArrayField(
-            entities_as_leafs_hash, padding_value=-1, dtype=np.int64
-        )
-        fields["leaf_types"] = ArrayField(
-            entities_as_leafs_types,
-            padding_value=self._type_dict["nan"],
-            dtype=np.int32,
-        )
+        fields.update(
+            {
+                "relation": ArrayField(relation, padding_value=-1, dtype=np.int32),
+                "entities": MetadataField(entities_as_leafs),
+                 "orig_entities": MetadataField(orig_entities),
+                 "leaf_hash": ArrayField(
+                    entities_as_leafs_hash, padding_value=-1, dtype=np.int64
+                ),
+                "leaf_types": ArrayField(
+                    entities_as_leafs_types,
+                    padding_value=self._type_dict["nan"],
+                    dtype=np.int32,
+                )
+            })
 
         if has_gold:
             leaf_indices, is_gold_leaf, depth = self.is_gold_leafs(
@@ -440,7 +425,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
         fields["offsets"] = ArrayField(
             np.array(offsets), padding_value=0, dtype=np.int32
         )
-        fields["enc"] = TextField(enc_field_list, self._utterance_token_indexers)
+        fields["enc"] = TextField(enc_field_list)
 
         ins = Instance(fields)
         return ins
@@ -548,6 +533,9 @@ class SmbopSpiderDatasetReader(DatasetReader):
                     span_text = self._tokenizer.tokenizer.decode(utt_idx[i_ : j_ + 1])
                     span_hash_array[i_, j_] = self.hash_text(span_text)
         return span_hash_array
+
+    def apply_token_indexers(self, instance: Instance) -> None:
+        instance.fields["enc"].token_indexers = self._utterance_token_indexers
 
 
 def table_text_encoding(entity_text_list):
