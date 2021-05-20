@@ -173,14 +173,18 @@ class SmbopSpiderDatasetReader(DatasetReader):
 
     @overrides
     def _read(self, file_path): #:str
-        if type(file_path) == str and file_path.endswith(".json"):
-            yield from self._read_examples_file(file_path, 'str')
-        elif type(file_path) == list and file_path[0].endswith(".json"):
-            yield from self._read_examples_file(file_path, 'list')
+        if file_path.endswith(".json"):
+            yield from self._read_examples_file(file_path)
         else:
             raise ConfigurationError(f"Don't know how to read filetype of {file_path}")
+        # if type(file_path) == str and file_path.endswith(".json"):
+        #     yield from self._read_examples_file(file_path, 'str')
+        # elif type(file_path) == list and file_path[0].endswith(".json"):
+        #     yield from self._read_examples_file(file_path, 'list')
+        # else:
+        #     raise ConfigurationError(f"Don't know how to read filetype of {file_path}")
 
-    def _read_examples_file(self, file_path, type): # : str
+    def _read_examples_file(self, file_path, type='str'): # : str
         # cache_dir = os.path.join("cache", file_path.split("/")[-1])
 
         cnt = 0
@@ -392,7 +396,7 @@ class SmbopSpiderDatasetReader(DatasetReader):
             value_list = np.array(
                 [self.hash_text(x) for x in node_util.get_literals(tree_obj)],
                 dtype=np.int64,
-            )
+            ) # value
             is_gold_span = np.isin(span_hash_array.reshape([-1]), value_list).reshape(
                 [utt_len, utt_len]
             )

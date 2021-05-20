@@ -60,7 +60,7 @@ def run():
     parser.add_argument("--rat_dropout", default=0.2, type=float)
     parser.add_argument("--lm_lr", default=3e-6, type=float)
     parser.add_argument("--lr", type=float, default=0.000186)
-    parser.add_argument("--batch_size", default=20, type=int) # 20
+    parser.add_argument("--batch_size", default=30, type=int) # 20
     parser.add_argument("--grad_acum", default=4, type=int)
     parser.add_argument("--max_steps", default=60000, type=int) # 60000
     parser.add_argument("--power", default=0.5, type=float)
@@ -96,8 +96,8 @@ def run():
     experiment_name_parts = []
     experiment_name_parts.append(namegenerator.gen())
 
-    if diff:
-        experiment_name_parts.append(diff)
+    # if diff:
+    #     experiment_name_parts.append(diff)
 
     if args.name:
         experiment_name_parts.append(args.name)

@@ -345,6 +345,7 @@ class SmbopParser(Model):
         self._device = enc["tokens"]["token_ids"].device
         self.move_to_gpu(self._device)
         batch_size = len(db_id)
+        # Algorithm line 2
         self.hasher = hashing.Hasher(self._device)
         (
             embedded_schema,
@@ -368,6 +369,7 @@ class SmbopParser(Model):
         )
         if hash_gold_levelorder is not None:
             new_hash_gold_levelorder = hash_gold_levelorder.sort()[0].transpose(0, 1)
+        # Algorithm line 3
         if self.value_pred:
             span_scores, start_logits, end_logits = self.score_spans(
                 embedded_utterance, utterance_mask
@@ -415,11 +417,11 @@ class SmbopParser(Model):
             _, leaf_span_mask, best_spans = allennlp.nn.util.masked_topk(
                 final_span_scores.view([batch_size, -1]),
                 span_mask.view([batch_size, -1]),
-                self._num_values,
+                self._num_values, # DB values top k / 2
             )
             span_start_indices = best_spans // utterance_length
             span_end_indices = best_spans % utterance_length
-
+            # batched_index_select: filter by indice
             start_span_rep = allennlp.nn.util.batched_index_select(
                 embedded_utterance.contiguous(), span_start_indices
             )
@@ -471,7 +473,7 @@ class SmbopParser(Model):
             allennlp.nn.util.min_value_of_dtype(final_leaf_schema_scores.dtype),
         )
 
-        min_k = torch.clamp(schema_mask.sum(-1), 0, self._n_schema_leafs)
+        min_k = torch.clamp(schema_mask.sum(-1), 0, self._n_schema_leafs) # schema top k / 2
         _, leaf_schema_mask, top_beam_indices = allennlp.nn.util.masked_topk(
             final_leaf_schema_scores.squeeze(-1), mask=schema_mask.bool(), k=min_k
         )
@@ -543,11 +545,12 @@ class SmbopParser(Model):
         #     for b in range(batch_size)
         # ]
 
+        # Algorithm line 4
         for decoding_step in range(self._decoder_timesteps):
             batch_size, seq_len, _ = beam_rep.shape
             if self.utt_aug:
                 enriched_beam_rep = self._augment_with_utterance(
-                    embedded_utterance,
+                    embedded_utterance, # encoded output
                     utterance_mask,
                     beam_rep,
                     beam_mask,
@@ -919,10 +922,10 @@ class SmbopParser(Model):
         left = self.left_emb(beam_rep.reshape([batch_size, seq_len, 1, emb_size]))
         right = self.right_emb(beam_rep.reshape([batch_size, 1, seq_len, emb_size]))
         binary_ops_reps = self.after_add(left + right)
-        binary_ops_reps = binary_ops_reps.reshape(-1, seq_len ** 2, self.d_frontier)
-        unary_ops_reps = self._unary_frontier_embedder(beam_rep)
+        binary_ops_reps = binary_ops_reps.reshape(-1, seq_len ** 2, self.d_frontier)  # [batch size, 30 * 30, 521]
+        unary_ops_reps = self._unary_frontier_embedder(beam_rep) # [batch size, 30, 521]
         pre_frontier_rep = torch.cat([binary_ops_reps, unary_ops_reps], dim=1)
-        pre_frontier_rep = self.pre_op_linear(pre_frontier_rep)
+        pre_frontier_rep = self.pre_op_linear(pre_frontier_rep) # [batch size, 930, 521]
 
         base_frontier_scores = self.op_linear(pre_frontier_rep)
         binary_frontier_scores, unary_frontier_scores = torch.split(
@@ -930,7 +933,7 @@ class SmbopParser(Model):
         )
         binary_frontier_scores, _ = torch.split(
             binary_frontier_scores, [self.binary_op_count, self.unary_op_count], dim=2
-        )
+        ) # ?
         _, unary_frontier_scores = torch.split(
             unary_frontier_scores, [self.binary_op_count, self.unary_op_count], dim=2
         )
